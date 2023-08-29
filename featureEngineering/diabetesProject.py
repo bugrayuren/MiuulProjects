@@ -78,3 +78,23 @@ indexOutliers = OutlierCather(df, "BloodPressure")
 
 
 def OutlierRatio(df):
+    all_outlier_indices = []
+    num_outlier_by_column = {}
+    numericalColumns, categoricalColumns, catButCardinal = ColumnClassifier(df)
+    for col in numericalColumns:
+        outlier_indices = list(OutlierCather(df, col))
+        all_outlier_indices += outlier_indices
+        num_outlier_by_column[col] = len(outlier_indices)
+    outliers_array = np.array(all_outlier_indices)
+    ratio = len(np.unique(outliers_array)) / df.shape[0] * 100
+    print(f"\n"
+          f"Outliers ratio to whole dataset: {round(ratio,2)}"
+          f"\n")
+    if (ratio > 5):
+        print("LARGE AMOUNT OF OUTLIER. REMOVAL IS NOT RECOMENDED")
+    return num_outlier_by_column
+#Önemli. Çıktı şu anda dict halinde. Pandas Dataframe haline getirilirse daha iyi olur.
+out_dict = OutlierRatio(df)
+df.shape[0]
+
+
