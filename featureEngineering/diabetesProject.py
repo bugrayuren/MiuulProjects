@@ -2,17 +2,46 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.neighbors import LocalOutlierFactor
+
+
 #Veri temizliği için gerekli adımlar sırasıyla
 # Outliers
+# 1-) Remove
+# 2-) Re-assignment with tresholds
+# Local Outlier analysis?
 # Missing Values
 # Encoding
-
+pd.set_option('display.width', 100)
+pd.set_option('display.max_columns', 500)
 df = pd.read_csv("diabetes.csv")
 df.info()
+#  #   Column                    Non-Null Count  Dtype
+# ---  ------                    --------------  -----
+#  0   Pregnancies               768 non-null    int64
+#  1   Glucose                   768 non-null    int64
+#  2   BloodPressure             768 non-null    int64
+#  3   SkinThickness             768 non-null    int64
+#  4   Insulin                   768 non-null    int64
+#  5   BMI                       768 non-null    float64
+#  6   DiabetesPedigreeFunction  768 non-null    float64
+#  7   Age                       768 non-null    int64
+#  8   Outcome                   768 non-null    int64
+
+df.describe()
 
 
-#################### OUTLIERS ########################
-def ColumnClassifier(df):
+def check_df()
+
+
+
+
+
+
+########################################
+##############  OUTLIERS  ##############
+########################################
+def ColumnClassifier(df, report = True):
 
     numericalColumns = [colName for colName in df.columns if df[colName].dtypes in ["int64","int32","float64","float32"] and df[colName].nunique() > 30]
     categoricalColumns = [colName for colName in df.columns if df[colName].dtypes in ["O"] and df[colName].nunique() < 10]
@@ -21,22 +50,22 @@ def ColumnClassifier(df):
     numofClassified= len(numericalColumns) + len(categoricalColumns) + len(catButCardinal) + len(numButCat)
 
 
-
-    print(f"\nI'M REPORTING SIR! \n"
-          f"*********\n"
-          f"The number of Numerical Columns: {len(categoricalColumns)}\n"
-          f"The number of Numerical Columns: {len(numericalColumns)}\nThe number of Cardinal Columns: {len(catButCardinal)}\n"
-          f"The number of numButCat Columns:{len(numButCat)}\n"
-          f"SUM OF THESE COLUMNS IS {numofClassified} SIR\n"
-          f"NUMBER OF THE COLUMNS IN DATASET IS {df.shape[1]}\n"
-          f"We converted numButCat to Categorical Columns SIR!\n")
+    if report:
+        print(f"\nI'M REPORTING SIR! \n"
+              f"*********\n"
+              f"The number of Numerical Columns: {len(categoricalColumns)}\n"
+              f"The number of Numerical Columns: {len(numericalColumns)}\nThe number of Cardinal Columns: {len(catButCardinal)}\n"
+              f"The number of numButCat Columns:{len(numButCat)}\n"
+              f"SUM OF THESE COLUMNS IS {numofClassified} SIR\n"
+              f"NUMBER OF THE COLUMNS IN DATASET IS {df.shape[1]}\n"
+              f"We converted numButCat to Categorical Columns SIR!\n")
 
     categoricalColumns.append(numButCat)
-
-    if (numofClassified == df.shape[1]):
-        print("***\nOperation HAMMEROFTHEMADGOD flawlessly accomplished SIR!\n***")
-    else:
-        print("***\nOperation failed.\n***")
+    if report:
+        if (numofClassified == df.shape[1]):
+            print("***\nOperation HAMMEROFTHEMADGOD flawlessly accomplished SIR!\n***")
+        else:
+            print("***\nOperation failed.\n***")
 
 
     return numericalColumns, categoricalColumns, catButCardinal
@@ -67,10 +96,11 @@ def TresholdSelector(df, numCol, up=0.75, low=0.25, iqrCoef = 1.5):
 low, up = TresholdSelector(df, "BloodPressure")
 
 
-def OutlierCather(df , numCol, index = True):
+def OutlierCather(df , numCol, index = True, report = True):
     low, up = TresholdSelector(df, numCol)
     numOutlier = df[((df[numCol]<low) | (df[numCol]>up))].shape[0]
-    print(f"\n Number of outliers in {numCol} is {numOutlier} SIR!\n")
+    if report:
+        print(f"\n Number of outliers in {numCol} is {numOutlier} SIR!\n")
     if index:
         return df[((df[numCol]<low) | (df[numCol]>up))].index
 
@@ -80,9 +110,9 @@ indexOutliers = OutlierCather(df, "BloodPressure")
 def OutlierRatio(df):
     all_outlier_indices = []
     num_outlier_by_column = {}
-    numericalColumns, categoricalColumns, catButCardinal = ColumnClassifier(df)
+    numericalColumns, categoricalColumns, catButCardinal = ColumnClassifier(df, report=False)
     for col in numericalColumns:
-        outlier_indices = list(OutlierCather(df, col))
+        outlier_indices = list(OutlierCather(df, col, report=False))
         all_outlier_indices += outlier_indices
         num_outlier_by_column[col] = len(outlier_indices)
     outliers_array = np.array(all_outlier_indices)
@@ -98,3 +128,58 @@ out_dict = OutlierRatio(df)
 df.shape[0]
 
 
+def removeOutliers(df, numColName):
+    indices = OutlierCather(df, numColName, report=False)
+    return df.drop(indices)
+#Since number of outliers in Blood Pressure is 45, difference between number of rows original df and 'without outlier df' must be 45
+without_outlier = removeOutliers(df, "BloodPressure")
+df.shape[0] - without_outlier.shape[0]
+
+def replace_with_tresholds(df, numColName, inplace = False):
+    low, up = TresholdSelector(df, numColName)
+    if inplace:
+        df.loc[df[numColName] < low, numColName] = low
+        df.loc[df[numColName] > up, numColName] = up
+
+    else:
+        copy_df = df.copy()
+        copy_df.loc[copy_df[numColName] < low, numColName] = low
+        copy_df.loc[copy_df[numColName] > up, numColName] = up
+        return copy_df
+
+new_df = replace_with_tresholds(df, "BloodPressure")
+OutlierCather(new_df, numCol="BloodPressure", index=False)
+# Number of outliers 0. Test has been passed.
+
+#Lets try a more complex outlier detection technique to see whether there is a significant difference.
+#Local Outlier Factor
+
+clf = LocalOutlierFactor(n_neighbors=20)
+clf.fit_predict(df)
+df_scores = clf.negative_outlier_factor_
+scores = pd.DataFrame(np.sort(df_scores))
+scores.plot(stacked=True, xlim=[0, 50], style='.-')
+plt.show()
+th = np.sort(df_scores)[10]
+lof_implemented_df =df[df_scores<th]
+lof_implemented_df.shape[0]
+#It has found just 10 outliers
+
+# 10/df.shape[0] is 0.13 so it would be a clever decision to take care of the outliers only found in this method
+# since other method directs me to remove or change at least 16% of the whole data points
+
+df = df[df_scores >= th]
+
+df.shape[0]
+
+
+########################################
+###########  MISSING VALUES  ###########
+########################################
+
+
+def missing_values_report(df):
+    col_with_missing_values = [col for col in df.columns if df[col].isnull().sum() > 0]
+
+df.isnull().sum()
+#there is no missing values.
