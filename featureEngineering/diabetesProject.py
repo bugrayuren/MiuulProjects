@@ -2,7 +2,12 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib
 from sklearn.neighbors import LocalOutlierFactor
+
+#The following argument is placed to fix "not responding" problem caused by mathplotlib or my IDE.
+#It works for me but I'm not aware of the details.
+matplotlib.use('Qt5Agg')
 
 
 #Veri temizliği için gerekli adımlar sırasıyla
@@ -30,11 +35,67 @@ df.info()
 
 df.describe()
 
+df["BloodPressure"].hist()
+plt.show()
 
-def check_df()
+# I've to confess that I wasn't even inspired by the course I take for following function
+# as I do in other functions in this project. Differing from them I totally copied
+# it from Miuul's documents.
+def check_df(df, head=5):
+    print("##################### Shape #####################")
+    print(df.shape)
+    print("##################### Types #####################")
+    print(df.dtypes)
+    print("##################### Head #####################")
+    print(df.head(head))
+    print("##################### Tail #####################")
+    print(df.tail(head))
+    print("##################### NA #####################")
+    print(df.isnull().sum())
+    print("##################### Quantiles #####################")
+    print(df.describe([0, 0.05, 0.50, 0.95, 0.99, 1]).T)
 
 
 
+check_df(df)
+
+##################### NA #####################
+# Pregnancies                 0
+# Glucose                     0
+# BloodPressure               0
+# SkinThickness               0
+# Insulin                     0
+# BMI                         0
+# DiabetesPedigreeFunction    0
+# Age                         0
+# Outcome                     0
+# dtype: int64
+
+#By nature, these variables except for 'Pregnancies'
+# and 'Outcome' (which is out target boolean variable)
+# cannot be 0. As mentioned in metadata, these values
+# should be assumed NA values
+
+# An adhoc solution for this problem
+target_columns = [col for col in df.columns if col not in ["Pregnancies", "Outcome"]]
+
+# ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']
+for col in target_columns:
+    df[col] = df[col].apply(lambda x: np.nan if (x == 0) else x)
+
+check_df(df)
+# New number of null values make more sense
+# ##################### NA #####################
+# Pregnancies                   0
+# Glucose                       5
+# BloodPressure                35
+# SkinThickness               227
+# Insulin                     374
+# BMI                          11
+# DiabetesPedigreeFunction      0
+# Age                           0
+# Outcome                       0
+# dtype: int64
 
 
 
