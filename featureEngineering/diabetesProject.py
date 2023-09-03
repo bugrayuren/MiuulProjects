@@ -84,7 +84,7 @@ for col in target_columns:
     df[col] = df[col].apply(lambda x: np.nan if (x == 0) else x)
 
 check_df(df)
-# New number of null values make more sense
+# New number of null values make more sense"
 # ##################### NA #####################
 # Pregnancies                   0
 # Glucose                       5
@@ -166,6 +166,8 @@ def OutlierCather(df , numCol, index = True, report = True):
         return df[((df[numCol]<low) | (df[numCol]>up))].index
 
 indexOutliers = OutlierCather(df, "BloodPressure")
+# Number of outliers in BloodPressure is 14 SIR!
+
 
 
 def OutlierRatio(df):
@@ -184,17 +186,28 @@ def OutlierRatio(df):
     if (ratio > 5):
         print("LARGE AMOUNT OF OUTLIER. REMOVAL IS NOT RECOMENDED")
     return num_outlier_by_column
+
 #Önemli. Çıktı şu anda dict halinde. Pandas Dataframe haline getirilirse daha iyi olur.
 out_dict = OutlierRatio(df)
+#Outliers ratio to whole dataset: 10.42
+#{'Glucose': 0,
+#'BloodPressure': 14,
+#'SkinThickness': 3,
+#'Insulin': 24,
+#'BMI': 8,
+#'DiabetesPedigreeFunction': 29,
+#'Age': 9}
 df.shape[0]
 
 
 def removeOutliers(df, numColName):
     indices = OutlierCather(df, numColName, report=False)
     return df.drop(indices)
-#Since number of outliers in Blood Pressure is 45, difference between number of rows original df and 'without outlier df' must be 45
+#How much data we would lose if we got rid of them?
 without_outlier = removeOutliers(df, "BloodPressure")
 df.shape[0] - without_outlier.shape[0]
+#The answer is 14.
+# 0.018229166666666668 % of the data. It can be discarded.
 
 def replace_with_tresholds(df, numColName, inplace = False):
     low, up = TresholdSelector(df, numColName)
@@ -215,24 +228,30 @@ OutlierCather(new_df, numCol="BloodPressure", index=False)
 #Lets try a more complex outlier detection technique to see whether there is a significant difference.
 #Local Outlier Factor
 
-clf = LocalOutlierFactor(n_neighbors=20)
-clf.fit_predict(df)
-df_scores = clf.negative_outlier_factor_
-scores = pd.DataFrame(np.sort(df_scores))
-scores.plot(stacked=True, xlim=[0, 50], style='.-')
-plt.show()
-th = np.sort(df_scores)[10]
-lof_implemented_df =df[df_scores<th]
-lof_implemented_df.shape[0]
+#to use following LocalOutlierFactor method, we have to drop NaN values.
+#LOF does not accept missinf values
+dropped_df = df.dropna()
+dropped_df.shape[0]-df.shape[0]
+#However, since the number of missing valuesi too high, it would not be wise if we deleted them
+
+#clf = LocalOutlierFactor(n_neighbors=20)
+#clf.fit_predict(df)
+#df_scores = clf.negative_outlier_factor_
+#scores = pd.DataFrame(np.sort(df_scores))
+#scores.plot(stacked=True, xlim=[0, 50], style='.-')
+#plt.show()
+#th = np.sort(df_scores)[10]
+#lof_implemented_df =df[df_scores<th]
+#lof_implemented_df.shape[0]
 #It has found just 10 outliers
 
 # 10/df.shape[0] is 0.13 so it would be a clever decision to take care of the outliers only found in this method
 # since other method directs me to remove or change at least 16% of the whole data points
 
-df = df[df_scores >= th]
+#df = df[df_scores >= th]
 
 df.shape[0]
-
+df.isnull().sum()
 
 ########################################
 ###########  MISSING VALUES  ###########
@@ -241,6 +260,68 @@ df.shape[0]
 
 def missing_values_report(df):
     col_with_missing_values = [col for col in df.columns if df[col].isnull().sum() > 0]
+    return col_with_missing_values
 
 df.isnull().sum()
-#there is no missing values.
+#Pregnancies                   0
+#Glucose                       5
+#BloodPressure                35
+#SkinThickness               227
+#Insulin                     374
+#BMI                          11
+#DiabetesPedigreeFunction      0
+#Age                           0
+#Outcome                       0
+#dtype: int64
+
+#To apply impute, I wanted to look correlation
+
+corr = df[numCol].corr()
+
+sns.set(rc={'figure.figsize': (12, 12)})
+sns.heatmap(corr, cmap="RdBu")
+plt.show()
+df.isnull().any(axis=1).sum()
+
+
+def what_if_missing_analysis(df, report = True):
+    results = {}
+    for col in df.columns:
+        df_droped = df[~df[col].isnull()]
+        numOfDropped=df.shape[0]-df_droped.shape[0] #eksilen satır saysı
+        initial_na= df.isnull().sum().sum() #toplam na sayısı baştaki
+        secondary_na=df_droped.isnull().sum().sum() #toplam na sayısı işlem sonrası
+        extra_dropped = (initial_na - secondary_na) - numOfDropped
+        percentage = round(numOfDropped/df.shape[0]*100,2)
+        if report:
+            print(f"******* REPORT FOR {col} *******")
+            print(f"NA OF ALL COLUMNS BEFORE OPERATION: {initial_na}")
+            print(f"NA OF ALL COLUMNS AFTER OPERATION: {secondary_na}")
+            print(f"Dropped in the column: {(numOfDropped)}")
+            print(f"Extra dropped NAs from other columns: {extra_dropped}")
+            print(f"%{round(numOfDropped/df.shape[0]*100,2)} of the data would be lost")
+            print(f"")
+        results[col]=percentage
+    return results
+
+
+results = what_if_missing_analysis(df, numCol)
+
+#{'Glucose': 0.65,
+# 'BloodPressure': 4.56,
+#'SkinThickness': 29.56,
+#'Insulin': 48.7,
+#'BMI': 1.43,
+#'DiabetesPedigreeFunction': 0.0,
+#'Age': 0.0}
+
+
+df_new = df.drop(["Insulin","SkinThickness"], axis=1)
+
+results_new = what_if_missing_analysis(df_new)
+
+
+
+
+
+
