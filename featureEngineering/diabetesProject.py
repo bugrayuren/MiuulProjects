@@ -17,7 +17,7 @@ matplotlib.use('Qt5Agg')
 # Local Outlier analysis?
 # Missing Values
 # Encoding
-pd.set_option('display.width', 100)
+pd.set_option('display.width', 500)
 pd.set_option('display.max_columns', 500)
 df = pd.read_csv("diabetes.csv")
 df.info()
@@ -224,6 +224,10 @@ def replace_with_tresholds(df, numColName, inplace = False):
 new_df = replace_with_tresholds(df, "BloodPressure")
 OutlierCather(new_df, numCol="BloodPressure", index=False)
 # Number of outliers 0. Test has been passed.
+for col in df.columns:
+    df = replace_with_tresholds(df, col)
+
+OutlierRatio(df)
 
 #Lets try a more complex outlier detection technique to see whether there is a significant difference.
 #Local Outlier Factor
@@ -316,10 +320,73 @@ results = what_if_missing_analysis(df, numCol)
 #'Age': 0.0}
 
 
-df_new = df.drop(["Insulin","SkinThickness"], axis=1)
+df = df.drop(["Insulin","SkinThickness"], axis=1)
 
-results_new = what_if_missing_analysis(df_new)
+results_new = what_if_missing_analysis(df)
+def numRatioTable(df):
+    na_columns = [col for col in df.columns if df[col].isnull().sum() > 0]
+    n_na = df[na_columns].isnull().sum().sort_values()
+    ratio = df[na_columns].isnull().sum().sort_values() / df.shape[0]*100
+    #concatenate ratio and numbers
+    rat_na = pd.concat([n_na, ratio], axis=1, keys=["n_null","Ratio"])
+    return rat_na.round(2)
 
+results=numRatioTable(df)
+
+#Focusing on Glucose, BMI, BloodPressure
+f, axs = plt.subplots(1, 3, figsize=(8, 4))
+sns.histplot(data=df, y="Glucose", ax=axs[0])
+sns.histplot(data=df, y="BMI", ax=axs[1])
+sns.histplot(data=df, y="BloodPressure", ax=axs[2])
+f.tight_layout()
+
+
+for col in ["Glucose", "BMI", "BloodPressure"]:
+    df[col].fillna(df[col].mean(), inplace=True)
+
+
+#########################################################
+###############  FEATURE EXTRACTION  ####################
+#########################################################
+
+
+new_cut=pd.cut(df["Pregnancies"],[-1,0.9,5,20], labels=["No Child","1-5","5+"])
+
+new_cut.value_counts()
+
+# 1-5         438
+# 5+          219
+# No Child    111
+
+df["Categorical_Pregnancies"]=new_cut
+df.head()
+df.groupby("Categorical_Pregnancies")["Outcome"].apply("mean")
+
+# Categorical_Pregnancies
+# No Child    0.342342
+# 1-5         0.271689
+# 5+          0.506849
+
+new_bmi_cut=pd.cut(df["BMI"],[0,18.5,25,30,60], labels=["Underweight","Normal","Overweight","Obese"])
+df["Cat_BMI"] = new_bmi_cut
+
+df.groupby("Cat_BMI")["Outcome"].apply("mean")
+# Cat_BMI
+# Underweight    0.000000
+# Normal         0.064815
+# Overweight     0.244444
+# Obese          0.455882
+df["Cat_BMI"].value_counts()
+# Obese          476
+# Overweight     180
+# Normal         108
+# Underweight      4
+
+#Because there is very little data in Underweight, I've decided to merge them with Normal.
+df["Cat_BMI"] = df["Cat_BMI"].apply(lambda x: "Not Overweight" if x in ["Normal", "Underweight"] else x)
+
+sns.histplot(data=df, x="BloodPressure")
+sns.histplot(data=df, x="Age")
 
 
 
