@@ -4,6 +4,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
 from sklearn.neighbors import LocalOutlierFactor
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 
 #The following argument is placed to fix "not responding" problem caused by mathplotlib or my IDE.
 #It works for me but I'm not aware of the details.
@@ -389,6 +392,58 @@ sns.histplot(data=df, x="BloodPressure")
 sns.histplot(data=df, x="Age")
 
 
+def ordinallabelencoding(df, column, order):
+    le = LabelEncoder()
+    le.fit(order)
+    encoded = le.transform(df[column])
+    return encoded
 
 
+df["Categorical_Pregnancies"] = ordinallabelencoding(df,
+                                                    "Categorical_Pregnancies",
+                                                    order=["No Child", "1-5","5+"])
+df["Categorical_Pregnancies"].value_counts()
 
+# 0    438
+# 1    219
+# 2    111
+
+df["Cat_BMI"] = ordinallabelencoding(df,
+                                     "Cat_BMI",
+                                     order=["Not Overweight", "Overweight", "Obese"])
+
+df["Cat_BMI"].value_counts()
+# 1    476
+# 2    180
+# 0    112
+df["Cat_BMI"]=df["Cat_BMI"].astype("category")
+
+df["Categorical_Pregnancies"]=df["Categorical_Pregnancies"].astype("category")
+
+
+########### MODEL ####################
+y = df["Outcome"]
+X = df.drop("Outcome", axis=1)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=17)
+
+from sklearn.ensemble import RandomForestClassifier
+
+rf_model = RandomForestClassifier(random_state=46).fit(X_train, y_train)
+y_pred = rf_model.predict(X_test)
+accuracy_score(y_pred, y_test)
+
+def plot_importance(model, features, num=len(X), save=False):
+    feature_imp = pd.DataFrame({'Value': model.feature_importances_, 'Feature': features.columns})
+    plt.figure(figsize=(10, 10))
+    sns.set(font_scale=1)
+    sns.barplot(x="Value", y="Feature", data=feature_imp.sort_values(by="Value",
+                                                                      ascending=False)[0:num])
+    plt.title('Features')
+    plt.tight_layout()
+    plt.show()
+    if save:
+        plt.savefig('importances.png')
+
+
+plot_importance(rf_model, X_train)
