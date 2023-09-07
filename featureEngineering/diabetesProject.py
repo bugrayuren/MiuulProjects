@@ -420,6 +420,13 @@ df["Cat_BMI"]=df["Cat_BMI"].astype("category")
 
 df["Categorical_Pregnancies"]=df["Categorical_Pregnancies"].astype("category")
 
+###########Scaler#######
+scaler = StandardScaler()
+columns_to_scale = [col for col in df.columns if col != "Outcome"]
+df[columns_to_scale] = scaler.fit_transform(df[columns_to_scale])
+
+df.head()
+
 
 ########### MODEL ####################
 y = df["Outcome"]
@@ -447,3 +454,7 @@ def plot_importance(model, features, num=len(X), save=False):
 
 
 plot_importance(rf_model, X_train)
+
+
+#0.7662337662337663 Accuracy Without Scaling
+#0.7662337662337663 with scaling<
