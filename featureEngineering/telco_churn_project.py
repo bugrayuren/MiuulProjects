@@ -3,6 +3,9 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 
 #The following argument is placed to fix "not responding" problem caused by mathplotlib or my IDE.
 #It works for me but I'm not aware of the details.
@@ -182,8 +185,7 @@ sns.heatmap(corr, cmap="RdBu")
 plt.show()
 
 ########### Cross-Tab ##############
-cross_tab = pd.crosstab(df)
-print(cross_tab)
+
 catCols
 # Tech Support (no higher),  Device Protection (related to tech support), OnlineBackup, Online Security
 # grubu tamamen benzer oranlar gösteriyor ve ınternet Service ile yakından alakalı. Göz atılmalı.
@@ -244,7 +246,49 @@ ddf.groupby("anyStreaming")["Churn"].agg("mean")
 
 #data completely changed.
 
+#o halde eski versiyonu kullanıp one hot encoding yapacağım. label encoding olursa 0 1 2 değerleri arasında bir hiyerarşi
+#olduğu yanılgısına düşebilir model
 
 
+columns_to_dummy = [col for col in catCols if col != "Churn"]
+df = pd.get_dummies(df, columns=columns_to_dummy, drop_first=True)
 
 
+#Standartlaştırma işlemi
+
+scaler = StandardScaler()
+columns_to_scale = [col for col in df.columns if col != "Churn"]
+df[columns_to_scale] = scaler.fit_transform(df[columns_to_scale])
+
+df.head()
+
+
+# Model Oluşturma
+
+y = df["Churn"]
+X = df.drop("Churn", axis=1)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=17)
+
+from sklearn.ensemble import RandomForestClassifier
+
+rf_model = RandomForestClassifier(random_state=46).fit(X_train, y_train)
+y_pred = rf_model.predict(X_test)
+accuracy_score(y_pred, y_test)
+
+def plot_importance(model, features, num=len(X), save=False):
+    feature_imp = pd.DataFrame({'Value': model.feature_importances_, 'Feature': features.columns})
+    plt.figure(figsize=(10, 10))
+    sns.set(font_scale=1)
+    sns.barplot(x="Value", y="Feature", data=feature_imp.sort_values(by="Value",
+                                                                      ascending=False)[0:num])
+    plt.title('Features')
+    plt.tight_layout()
+    plt.show()
+    if save:
+        plt.savefig('importances.png')
+
+
+plot_importance(rf_model, X_train)
+
+ #0.785781990521327 accuracy
