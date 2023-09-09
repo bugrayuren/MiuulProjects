@@ -186,5 +186,65 @@ cross_tab = pd.crosstab(df)
 print(cross_tab)
 catCols
 # Tech Support (no higher),  Device Protection (related to tech support), OnlineBackup, Online Security
-# grubu tamamen benzer oranlar gösteriyor ve ınternet Service ile yakından alakalı. Correlation map sırasında
+# grubu tamamen benzer oranlar gösteriyor ve ınternet Service ile yakından alakalı. Göz atılmalı.
+
+###### Feature Engineering #####
+
+df.head()
+df["customerID_0"] = df["customerID"].apply(lambda x: x.split("-")[0])
+df["customerID_1"] = df["customerID"].apply(lambda x: x.split("-")[1])
+df["customerID_1"].shape[0]-df["customerID_1"].nunique()
+# Harfli kısımda sadece 3 tekrar eden değer var. Buradan bir şey çıkmayabilir
+df["customerFirstLetter"] = df["customerID_1"].apply(lambda x: x[0])
+df["customerFirstLetter"].value_counts()
+df.groupby("customerFirstLetter")["Churn"].apply("mean").sort_values()
+# Looks totally random.
+df.drop(["customerID_0","customerID_1", "customerFirstLetter"], axis = 1, inplace=True)
+
+#Herhangi bir internet bazlı teknik hizmet alıp almaamış olmasına göre bir kategori oluşturulabilir
+
+internetRelatedCats = ["OnlineSecurity", "OnlineBackup", "DeviceProtection","TechSupport", "StreamingTV" , "StreamingMovies"]
+df["is_ExtraInternetService"] = df.loc[:,internetRelatedCats].apply(lambda row: 'Yes' if 'Yes' in row.values else ("No internet service" if "No internet service" in row.values else "No"), axis=1)
+df["is_ExtraInternetService"].value_counts()
+df.groupby("is_ExtraInternetService")["Churn"].agg("mean")
+
+streamingCols = ["StreamingTV" , "StreamingMovies"]
+df["anyStreaming"] = df.loc[:,streamingCols].apply(lambda row: 'Yes' if 'Yes' in row.values else ("No internet service" if "No internet service" in row.values else "No"), axis=1)
+df["anyStreaming"].value_counts()
+df.groupby("anyStreaming")["Churn"].agg("mean")
+
+
+numCols, catCols, catButCarCols = ColumnClassifier(df)
+
+df.drop("customerID", axis=1, inplace= True)
+
+# 3 kategorili column sayımız çok fazla ve bunun kattığı değer o kadar da yüksek değil. 20 tane column ile one hot encoder
+# uygularsak en az 40 column olacak. No internet service içeren data pointlerin sayısı çok fazla ve churn oranları
+# Evet ve Hayır seçeneklerine göre çok düşük. Eğer bunu hayır ile birleştirirsem hayır'ın oranında büyük bir düşüş gözlenecek
+# Ama mantıken gerçekten de "Hayır" durumundalar. Sonuçta bu servisten faydalanmıyorlar. Haliyle deneysel yaklaşıp önce hepsini hayır'a
+# çevirip sonucu göreceğim
+ddf = df.copy()
+for col in catCols:
+    ddf[col] = ddf[col].apply(lambda x: "No" if (x == "No internet service") else x)
+
+ddf["anyStreaming"].value_counts()
+ddf.groupby("anyStreaming")["Churn"].agg("mean")
+# after merge
+# anyStreaming
+# No     0.228442
+# Yes    0.303577
+# Name: Churn, dtype: float64
+
+#before merge
+# anyStreaming
+# No                     0.344571
+# No internet service    0.074342
+# Yes                    0.303577
+# Name: Churn, dtype: float64
+
+#data completely changed.
+
+
+
+
 
