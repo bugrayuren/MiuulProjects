@@ -124,7 +124,7 @@ def ColumnClassifier(df, report = True):
               f"NUMBER OF THE COLUMNS IN DATASET IS {df.shape[1]}\n"
               f"We converted numButCat to Categorical Columns SIR!\n")
 
-    categoricalColumns.append(numButCat)
+    categoricalColumns= categoricalColumns + numButCat
     if report:
         if (numofClassified == df.shape[1]):
             print("***\nOperation HAMMEROFTHEMADGOD flawlessly accomplished SIR!\n***")

@@ -1,6 +1,12 @@
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib
+
+#The following argument is placed to fix "not responding" problem caused by mathplotlib or my IDE.
+#It works for me but I'm not aware of the details.
+matplotlib.use('Qt5Agg')
 
 pd.set_option('display.width', 500)
 pd.set_option('display.max_columns', 500)
@@ -24,6 +30,8 @@ def check_df(df, head=5):
 
 check_df(df)
 
+df.describe().T
+
 
 def ColumnClassifier(df, report = True):
 
@@ -37,14 +45,14 @@ def ColumnClassifier(df, report = True):
     if report:
         print(f"\nI'M REPORTING SIR! \n"
               f"*********\n"
-              f"The number of Numerical Columns: {len(categoricalColumns)}\n"
+              f"The number of Categorical Columns: {len(categoricalColumns)}\n"
               f"The number of Numerical Columns: {len(numericalColumns)}\nThe number of Cardinal Columns: {len(catButCardinal)}\n"
               f"The number of numButCat Columns:{len(numButCat)}\n"
               f"SUM OF THESE COLUMNS IS {numofClassified} SIR\n"
               f"NUMBER OF THE COLUMNS IN DATASET IS {df.shape[1]}\n"
               f"We converted numButCat to Categorical Columns SIR!\n")
 
-    categoricalColumns.append(numButCat)
+    categoricalColumns= categoricalColumns + numButCat
     if report:
         if (numofClassified == df.shape[1]):
             print("***\nOperation HAMMEROFTHEMADGOD flawlessly accomplished SIR!\n***")
@@ -66,9 +74,117 @@ df["TotalCharges"].dtypes
 # TotalCharges 7043 non - null object
 # So it will be wise to check all the object types.
 
-df["TotalCharges"] = df["TotalCharges"].astype("float64")
+#df["TotalCharges"] = df["TotalCharges"].astype("float64")
 # ValueError: could not convert string to float: ' '
 # This means we have hidden missing values
 
 df.loc[df["TotalCharges"]==' ',"TotalCharges"] = np.nan
 df["TotalCharges"] = df["TotalCharges"].astype("float64")
+
+
+#Önceki değişiklikler sebebiyle tekrar kategorize edelim
+numCols, catCols, catButCarCols = ColumnClassifier(df)
+
+def num_summary(dataframe, numerical_col, plot=False):
+    quantiles = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 0.95, 0.99]
+    print(dataframe[numerical_col].describe(quantiles).T)
+
+    if plot:
+        dataframe[numerical_col].hist()
+        plt.xlabel(numerical_col)
+        plt.title(numerical_col)
+        plt.show(block=True)
+
+
+#### Adım 3 Hedef Değişken analizi ###
+
+def cat_target_analysis(df, catCols, target):
+    for col in catCols:
+        print(df.groupby(col)[target].apply("mean"), end="\n\n\n")
+
+
+df["Churn"].value_counts()
+#Includes "Yes" "and "No"
+
+#The churn should be turned to integer to evaluate in terms of mean.
+df["Churn"] = df["Churn"].apply(lambda x: 1 if (x=="Yes") else 0)
+cat_target_analysis(df, catCols, "Churn")
+
+# Tech Support (no higher),  Device Protection (related to tech support), OnlineBackup, Online Security
+# grubu tamamen benzer oranlar gösteriyor ve ınternet Service ile yakından alakalı. Correlation map sırasında
+# bunları çıkarmak iyi olabilir.
+# Etkisi yokmuş gibi gözükenleri yazmak daha kolay:
+# Gender, Phone Service, Multiple Lines
+
+def num_target_analysis(df, numCols, target):
+    for col in numCols:
+        print(df.groupby(target)[col].apply("mean"),end="\n\n\n")
+
+
+num_target_analysis(df, numCols, "Churn")
+
+#Etkisi olmayabilecek olanlar: Monthly Charges şüpheli.
+
+
+########## Adım 5 Outliers #############
+def TresholdSelector(df, numCol, up=0.75, low=0.25, iqrCoef = 1.5):
+    upQuartile = df[numCol].quantile(up)
+    lowQuartile = df[numCol].quantile(low)
+    iqr = (upQuartile - lowQuartile)
+    upLimit = upQuartile + (iqrCoef*iqr)
+    lowLimit = lowQuartile - (iqrCoef*iqr)
+    return lowLimit, upLimit
+
+
+def OutlierCather(df , numCol, index = True, report = True):
+    low, up = TresholdSelector(df, numCol)
+    numOutlier = df[((df[numCol]<low) | (df[numCol]>up))].shape[0]
+    if report:
+        print(f"\n Number of outliers in {numCol} is {numOutlier} SIR!\n")
+    if index:
+        return df[((df[numCol]<low) | (df[numCol]>up))].index
+
+def OutlierRatio(df):
+    all_outlier_indices = []
+    num_outlier_by_column = {}
+    numericalColumns, categoricalColumns, catButCardinal = ColumnClassifier(df, report=False)
+    for col in numericalColumns:
+        outlier_indices = list(OutlierCather(df, col, report=False))
+        all_outlier_indices += outlier_indices
+        num_outlier_by_column[col] = len(outlier_indices)
+    outliers_array = np.array(all_outlier_indices)
+    ratio = len(np.unique(outliers_array)) / df.shape[0] * 100
+    print(f"\n"
+          f"Outliers ratio to whole dataset: {round(ratio,2)}"
+          f"\n")
+    if (ratio > 5):
+        print("LARGE AMOUNT OF OUTLIER. REMOVAL IS NOT RECOMENDED")
+    return num_outlier_by_column
+
+
+results = OutlierRatio(df)
+#no outliers
+
+####### Missing values #####
+df.isnull().sum().sum()/df.shape[0]
+
+#11 missing values. only .0001 of the data. Can be discarded without hesitation.
+
+df.dropna(inplace=True)
+
+df.isnull().sum().sum()
+# 0
+
+#########Adım 7 Correlation Analysis ###########
+
+corr = df[numCols].corr()
+sns.heatmap(corr, cmap="RdBu")
+plt.show()
+
+########### Cross-Tab ##############
+cross_tab = pd.crosstab(df)
+print(cross_tab)
+catCols
+# Tech Support (no higher),  Device Protection (related to tech support), OnlineBackup, Online Security
+# grubu tamamen benzer oranlar gösteriyor ve ınternet Service ile yakından alakalı. Correlation map sırasında
+
