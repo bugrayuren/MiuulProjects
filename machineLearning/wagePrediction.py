@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from sklearn.neighbors import LocalOutlierFactor
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.model_selection import train_test_split, cross_val_score
 
 matplotlib.use('Qt5Agg')
 pd.set_option('display.width', 500)
@@ -119,23 +123,7 @@ plt.show()
 # atBar Hits is also problematic (Runs)
 # Catbar and Chits is more problematic
 
-# finding carrer-long columns
 
-# c_columns = [col for col in df.columns if col.startswith("c") or col.startswith("C")]
-
-# Creating Avarage Columns
-
-
-# for col in c_columns:
-#     df["AVG_" + col[1:]] = df[col] / df["Years"]
-#
-# df.head()
-#
-#
-# corr = df.corr()
-# plt.figure(figsize=(10, 6))
-# sns.heatmap(corr, cmap="RdBu",annot=True)
-# plt.show()
 
 ############ Missing Values ##################
 
@@ -212,15 +200,140 @@ plt.show()
 
 th = np.sort(lof_scores)[12]
 
-df[lof_scores < th]
+lof_data[lof_scores < th]
 
-df[df_scores < th].shape
+lof_data[lof_scores < th].shape
+
+outlier_index = lof_data[lof_scores < th].index
+
+df.loc[outlier_index, :]
+
+ddf = df.drop(outlier_index, axis = 0)
+
+df.shape[0] - ddf.shape[0]
+# 12 which is what we expected
 
 
-df.describe([0.01, 0.05, 0.75, 0.90, 0.99]).T
+df = ddf
 
-df[df_scores < th].index
+############# MISSING VALUES ##################
 
-df[df_scores < th].drop(axis=0, labels=df[df_scores < th].index)
+df.isnull().sum()
+# Salary       56
+
+# imputing target variable disrupts the data and the model as well. So there is no other option than dropping them.
+df.dropna(axis = 0 , inplace=True)
+df.isnull().sum()
+
+############ Feature Engineering #########
+
+# 1- From Career-Long to Average
+
+# finding carrer-long columns
+
+c_columns = [col for col in df.columns if col.startswith("c") or col.startswith("C")]
+
+# Creating Avarage Columns
 
 
+for col in c_columns:
+    df["AVG_" + col[1:]] = df[col] / df["Years"]
+
+df.head()
+
+
+corr = df.corr()
+plt.figure(figsize=(10, 6))
+sns.heatmap(corr, cmap="RdBu",annot=True)
+plt.show()
+
+ddf = df.drop(labels=c_columns, axis = 1)
+
+corr = ddf.corr()
+plt.figure(figsize=(10, 6))
+sns.heatmap(corr, cmap="RdBu",annot=True)
+plt.show()
+
+ddf.drop(["AtBat", "AVG_AtBat"], axis = 1, inplace=True)
+ddf.drop(["Runs", "AVG_Runs"], axis = 1, inplace=True)
+
+df = ddf
+####### Encoding ##########
+
+numCols, catCols, carCols = ColumnClassifier(df)
+
+ddf = pd.get_dummies(df, columns=catCols, drop_first=True)
+
+##### Scaling #########
+
+ss = StandardScaler()
+columns_to_scale = [col for col in ddf.columns if col != "Salary"]
+ddf[columns_to_scale] = ss.fit_transform(ddf[columns_to_scale])
+ddf.head()
+
+#### Model ##########
+
+X = ddf.drop("Salary", axis=1)
+y = ddf["Salary"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=1)
+
+
+reg_model = LinearRegression().fit(X_train, y_train)
+
+reg_model.intercept_
+
+reg_model.coef_.shape[0] == X.shape[1]
+#True
+
+y_pred = reg_model.predict(X_train)
+# Train RMSE
+np.sqrt(mean_squared_error(y_train, y_pred))
+#317.1570604863033
+
+# Test RMSE
+y_pred = reg_model.predict(X_test)
+np.sqrt(mean_squared_error(y_test, y_pred))
+#267.89483261334334
+
+# TRAIN RKARE
+reg_model.score(X_train, y_train)
+
+# Test RKARE
+reg_model.score(X_test, y_test)
+
+y.mean()
+y.std()
+
+# Cross Validation
+
+np.mean(np.sqrt(-cross_val_score(reg_model,
+                                 X,
+                                 y,
+                                 cv=10,
+                                 scoring="neg_mean_squared_error")))
+# 325.0908372562789
+
+# 5 Katlı CV RMSE
+np.mean(np.sqrt(-cross_val_score(reg_model,
+                                 X,
+                                 y,
+                                 cv=5,
+                                 scoring="neg_mean_squared_error")))
+
+# 331.50645401609165
+
+def reg_plot_importance(model, features, num=len(X), save=False):
+    feature_imp = pd.DataFrame({'Value': [abs(x) for x in reg_model.coef_], 'Feature': X.columns})
+    plt.figure(figsize=(10, 10))
+    sns.set(font_scale=1)
+    sns.barplot(x="Value", y="Feature", data=feature_imp.sort_values(by="Value",
+                                                                      ascending=False)[0:num])
+    plt.title('Features')
+    plt.tight_layout()
+    plt.show()
+    if save:
+        plt.savefig('importances.png')
+
+
+reg_plot_importance(reg_model, X_train)
